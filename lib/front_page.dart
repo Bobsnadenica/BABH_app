@@ -2,10 +2,10 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:document_scanner_flutter/document_scanner_flutter.dart';
-import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
+import 'ocr_call.dart';
+import 'package:flutter/foundation.dart';
 
 class FrontPage extends StatelessWidget {
   const FrontPage({super.key});
@@ -169,54 +169,6 @@ class _FolderPageState extends State<FolderPage> {
     );
   }
 
-  Future<String> _prepareTessData() async {
-    final baseDir = await getApplicationDocumentsDirectory();
-    final tessdataDir = Directory('${baseDir.path}/tessdata');
-    if (!await tessdataDir.exists()) {
-      await tessdataDir.create(recursive: true);
-    }
-    final trainedDataFile = File('${tessdataDir.path}/bul.traineddata');
-    if (!await trainedDataFile.exists()) {
-      try {
-        final dataAsset = await rootBundle.load('assets/tessdata/bul.traineddata');
-        await trainedDataFile.writeAsBytes(dataAsset.buffer.asUint8List(), flush: true);
-        debugPrint('📦 bul.traineddata exists after copy: ${await trainedDataFile.exists()}');
-      } catch (e) {
-        debugPrint('⚠️ Could not copy tessdata file: $e');
-      }
-    }
-    return baseDir.path;
-  }
-
-  Future<String> _safeExtractText(String imagePath, String language, Map<String, dynamic> args) async {
-    // Defensive deep copy and normalization
-    final normalized = <String, dynamic>{};
-    args.forEach((key, value) {
-      if (value == null) return;
-      if (value is Iterable) {
-        normalized[key] = value.whereType<String>().toList();
-      } else if (value is Map) {
-        normalized[key] = Map<String, dynamic>.from(value);
-      } else {
-        normalized[key] = value;
-      }
-    });
-
-    // Guarantee structure expected by plugin
-    normalized.putIfAbsent("user_words", () => <String>[]);
-    normalized.putIfAbsent("user_patterns", () => <String>[]);
-    normalized.putIfAbsent("configs", () => <String>[]);
-    normalized.putIfAbsent("variables", () => <String>[]);
-
-    debugPrint('🧩 Normalized OCR args: $normalized');
-
-    return await FlutterTesseractOcr.extractText(
-      imagePath,
-      language: language,
-      args: normalized,
-    );
-  }
-
   Future<void> _scanAndSave() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -228,13 +180,19 @@ class _FolderPageState extends State<FolderPage> {
         return;
       }
 
-      // Ensure folder exists and compute save path
-      final folder = await _ensureFolder();
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final savePath = '${folder.path}/$timestamp.jpg';
+      await _showProgress('Стартиране на сканиране…');
 
-      // Try scanner
-      dynamic scanned = await DocumentScannerFlutter.launch(context);
+      dynamic scanned;
+      try {
+        scanned = await DocumentScannerFlutter.launch(context);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Грешка при стартиране на камерата: $e')),
+        );
+        return;
+      } finally {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close progress dialog
+      }
 
       if (scanned == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,6 +200,11 @@ class _FolderPageState extends State<FolderPage> {
         );
         return;
       }
+
+      // Ensure folder exists and compute save path
+      final folder = await _ensureFolder();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final savePath = '${folder.path}/$timestamp.jpg';
 
       final saved = await _normalizeScannedResult(scanned, savePath);
       if (saved == null) {
@@ -251,45 +214,14 @@ class _FolderPageState extends State<FolderPage> {
         return;
       }
 
-      // Show progress while extracting text
       await _showProgress('Разпознаване на текст…');
 
-      final tessdataBasePath = await _prepareTessData();
-
-      debugPrint('📁 Using tessdata from: $tessdataBasePath/tessdata');
-      debugPrint('📄 File exists: ${await File("$tessdataBasePath/tessdata/bul.traineddata").exists()}');
-
-      // Optional: sanity check for tessdata presence (best-effort)
-      // We avoid throwing here; just inform the user if model is missing.
       String extractedText = '';
       try {
-        final Map<String, dynamic> ocrArgs = {
-          "psm": "6",
-          "oem": "1",
-          "tessdata": "$tessdataBasePath/tessdata",
-          "preserve_interword_spaces": "1",
-          "user_words": [" "], // Safe placeholder to avoid null iterable
-          "user_patterns": [" "],
-          "configs": [
-            "--tessdata-dir",
-            "$tessdataBasePath/tessdata",
-            "--tessedit_char_blacklist",
-            "|"
-          ],
-          "variables": {"debug_file": "/dev/null"}, // silent mode
-        };
-
-        // Clean nulls and ensure all fields are iterable-safe
-        ocrArgs.removeWhere((_, v) => v == null);
-
-        debugPrint('🔧 OCR args: $ocrArgs');
-
-        try {
-          extractedText = await _safeExtractText(saved.path, 'bul', ocrArgs);
-        } catch (e, st) {
-          debugPrint('⚠️ Tesseract error: $e\n$st');
-          extractedText = '';
-        }
+        extractedText = await OCRService.extractText(saved.path);
+      } catch (e) {
+        debugPrint('⚠️ OCRService.extractText error: $e');
+        extractedText = '';
       } finally {
         if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close progress
       }

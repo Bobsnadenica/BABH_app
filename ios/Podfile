@@ -42,17 +42,25 @@ post_install do |installer|
     end
   end
 
-  # WeScan Swift 6 fix — remove invalid @available properties and add safe stubs
+  # Ensure we have permission to patch WeScan
   we_scan_path = 'Pods/WeScan/WeScan/ImageScannerController.swift'
   if File.exist?(we_scan_path)
-    text = File.read(we_scan_path)
-    text.gsub!(/@available\(\*, *unavailable[^)]*\)\s*public var [^{]*\n/m, '')
-    unless text.include?('public var originalImage:')
-      text << "\npublic var originalImage: UIImage? { get { return nil } set { } }\n"
-      text << "public var scannedImage: UIImage? { get { return nil } set { } }\n"
-      text << "public var enhancedImage: UIImage? { get { return nil } set { } }\n"
-      text << "public var doesUserPreferEnhancedImage: Bool { get { return false } set { } }\n"
+    begin
+      system("chmod 777 #{we_scan_path}")
+      text = File.read(we_scan_path)
+      text.gsub!(/@available\(\*, *unavailable[^)]*\)\s*public var [^{]*\n/m, '')
+      unless text.include?('public var originalImage:')
+        text << "\npublic var originalImage: UIImage? { get { return nil } set { } }\n"
+        text << "public var scannedImage: UIImage? { get { return nil } set { } }\n"
+        text << "public var enhancedImage: UIImage? { get { return nil } set { } }\n"
+        text << "public var doesUserPreferEnhancedImage: Bool { get { return false } set { } }\n"
+      end
+      File.write(we_scan_path, text)
+      puts "✅ WeScan patch applied successfully."
+    rescue => e
+      puts "⚠️ Failed to patch WeScan: #{e}"
     end
-    File.write(we_scan_path, text)
+  else
+    puts "ℹ️ WeScan file not found — skipping patch."
   end
 end

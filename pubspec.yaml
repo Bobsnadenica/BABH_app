@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   # Document scanning and OCR
   document_scanner_flutter: ^0.2.7
-  flutter_tesseract_ocr: ^0.4.30
+  flutter_tesseract_ocr:
+    path: plugins/flutter_tesseract_ocr/flutter_tesseract_ocr
 
   # Camera and image management
   camera: ^0.10.6
