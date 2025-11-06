@@ -1,0 +1,14 @@
+{
+  "resourceName": "userphotos",
+  "policyUUID": "206ea87a",
+  "bucketName": "babh-user-photos",
+  "storageAccess": "auth",
+  "guestAccess": [],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE",
+  "groupAccess": {}
+}

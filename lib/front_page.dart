@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:document_scanner_flutter/document_scanner_flutter.dart';
-import 'ocr_call.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+import 'package:amplify_storage_s3/amplify_storage_s3.dart';
 
 class FrontPage extends StatelessWidget {
   const FrontPage({super.key});
@@ -175,97 +177,48 @@ class _FolderPageState extends State<FolderPage> {
     try {
       if (kIsWeb) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Сканирането не се поддържа в уеб. Използвайте устройство.')),
+          const SnackBar(content: Text('Камерата не се поддържа в уеб. Използвайте устройство.')),
         );
         return;
       }
 
-      await _showProgress('Стартиране на сканиране…');
-
-      dynamic scanned;
-      try {
-        scanned = await DocumentScannerFlutter.launch(context);
-      } catch (e) {
+      final picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      if (photo == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Грешка при стартиране на камерата: $e')),
-        );
-        return;
-      } finally {
-        if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close progress dialog
-      }
-
-      if (scanned == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Сканирането е отменено.')),
+          const SnackBar(content: Text('Снимането е отменено.')),
         );
         return;
       }
 
-      // Ensure folder exists and compute save path
       final folder = await _ensureFolder();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
       final savePath = '${folder.path}/$timestamp.jpg';
 
-      final saved = await _normalizeScannedResult(scanned, savePath);
-      if (saved == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Неуспешно запазване на сканираното изображение.')),
-        );
-        return;
-      }
+      await File(photo.path).copy(savePath);
 
-      await _showProgress('Разпознаване на текст…');
-
-      String extractedText = '';
       try {
-        extractedText = await OCRService.extractText(saved.path);
+        final user = await Amplify.Auth.getCurrentUser();
+        final key = '${user.userId}/${widget.folderName}/$timestamp.jpg';
+        await Amplify.Storage.uploadFile(
+          localFile: AWSFile.fromPath(savePath),
+          key: key,
+        );
+        debugPrint('✅ Uploaded to S3: $key');
       } catch (e) {
-        debugPrint('⚠️ OCRService.extractText error: $e');
-        extractedText = '';
-      } finally {
-        if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close progress
+        debugPrint('⚠️ Upload to S3 failed: $e');
       }
 
       if (!mounted) return;
       setState(() => _imagesFuture = _loadImages());
-
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Извлечен текст'),
-          content: SingleChildScrollView(
-            child: Text(
-              (extractedText.isEmpty)
-                  ? 'Няма открит текст. Уверете се, че файлът assets/tessdata/bul.traineddata е добавен в проекта и изображението е ясно.'
-                  : extractedText,
-            ),
-          ),
-          actions: [
-            if (extractedText.isNotEmpty)
-              TextButton(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: extractedText));
-                  if (mounted) Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Текстът е копиран')),
-                    );
-                  }
-                },
-                child: const Text('Копирай'),
-              ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Затвори'),
-            ),
-          ],
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Документът е заснет и запазен успешно.')),
       );
     } catch (e) {
       if (!mounted) return;
       debugPrint('❌ scanAndSave error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Грешка при сканиране: $e')),
+        SnackBar(content: Text('Грешка при заснемане: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -297,13 +250,31 @@ class _FolderPageState extends State<FolderPage> {
               mainAxisSpacing: 8,
             ),
             itemCount: images.length,
-            itemBuilder: (_, i) => GestureDetector(
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => Dialog(child: Image.file(images[i], fit: BoxFit.contain)),
-              ),
-              child: Image.file(images[i], fit: BoxFit.cover),
-            ),
+            itemBuilder: (_, i) {
+              final file = images[i];
+              final fileName = file.path.split('/').last;
+              String dateLabel = '';
+              try {
+                final nameWithoutExt = fileName.split('.').first;
+                final parsed = DateTime.tryParse(nameWithoutExt.replaceAll('-', ':')) ?? DateTime.now();
+                dateLabel = '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
+              } catch (_) {
+                dateLabel = '';
+              }
+              return GestureDetector(
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => Dialog(child: Image.file(file, fit: BoxFit.contain)),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(child: Image.file(file, fit: BoxFit.cover)),
+                    const SizedBox(height: 4),
+                    Text(dateLabel, style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),

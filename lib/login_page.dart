@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'front_page.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,24 +28,65 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
 
-    final user = _userCtrl.text.trim();
-    final pass = _passCtrl.text;
-
-    await Future.delayed(const Duration(milliseconds: 300)); // tiny UX delay
-
-    if (user == 'test' && pass == 'test') {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const FrontPage()),
+    try {
+      final result = await Amplify.Auth.signIn(
+        username: _userCtrl.text.trim(),
+        password: _passCtrl.text.trim(),
       );
-    } else {
-      if (!mounted) return;
+
+      // Handle "new password required" challenge
+      if (result.nextStep.signInStep == AuthSignInStep.confirmSignInWithNewPassword) {
+        final newPassword = await _promptForNewPassword();
+        if (newPassword != null && newPassword.isNotEmpty) {
+          await Amplify.Auth.confirmSignIn(confirmationValue: newPassword);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Паролата не беше променена')),
+          );
+          return;
+        }
+      }
+
+      final currentUser = await Amplify.Auth.getCurrentUser();
+      safePrint('✅ Logged in as: ${currentUser.username}');
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const FrontPage()),
+        );
+      }
+    } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Невалидни данни за вход (използвайте test / test)')),
+        SnackBar(content: Text('Грешка при вход: ${e.message}')),
       );
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
+  }
 
-    if (mounted) setState(() => _busy = false);
+  Future<String?> _promptForNewPassword() async {
+    final controller = TextEditingController();
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Нова парола'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Въведете нова парола'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отказ'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Запази'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -115,13 +158,18 @@ class _LoginPageState extends State<LoginPage> {
                                   : const Text('Вход'),
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _busy ? null : _forgotPasswordFlow,
+                            child: const Text('Забравена парола?'),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 12),
                     const Align(
                       alignment: Alignment.center,
-                      child: Text('Временно: test / test', style: TextStyle(color: Colors.black54)),
+                      child: Text('Временно: testtest / testtest', style: TextStyle(color: Colors.black54)),
                     ),
                   ],
                 ),
@@ -129,6 +177,91 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Forgot password: request code, then confirm with code + new password
+  Future<void> _forgotPasswordFlow() async {
+    final input = await _promptForUsername();
+    if (input == null || input.isEmpty) return;
+
+    final username = input.trim();
+
+    try {
+      await Amplify.Auth.resetPassword(username: username);
+      final data = await _promptForCodeAndNewPassword();
+      if (data == null) return;
+
+      final code = data['code']!;
+      final newPassword = data['password']!;
+      await Amplify.Auth.confirmResetPassword(
+        username: username,
+        newPassword: newPassword,
+        confirmationCode: code,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Паролата е сменена успешно.')),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Грешка при промяна на парола: ${e.message}')),
+      );
+    }
+  }
+
+  Future<String?> _promptForUsername() async {
+    final controller = TextEditingController();
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Забравена парола'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Въведете потребителско име'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отказ')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Продължи')),
+        ],
+      ),
+    );
+  }
+
+  Future<Map<String, String>?> _promptForCodeAndNewPassword() async {
+    final codeCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    return await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Въведете код и нова парола'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Код от имейл'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Нова парола'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отказ')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, {
+              'code': codeCtrl.text.trim(),
+              'password': passCtrl.text.trim(),
+            }),
+            child: const Text('Потвърди'),
+          ),
+        ],
       ),
     );
   }

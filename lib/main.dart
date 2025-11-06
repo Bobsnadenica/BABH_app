@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+import 'amplifyconfiguration.dart';
 import 'login_page.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _configureAmplify();
   runApp(const BabhDnevniciteApp());
+}
+
+Future<void> _configureAmplify() async {
+  final auth = AmplifyAuthCognito();
+  await Amplify.addPlugin(auth);
+  await Amplify.configure(amplifyconfig);
+  safePrint('✅ Amplify configured');
 }
 
 class BabhDnevniciteApp extends StatelessWidget {
@@ -22,7 +33,7 @@ class BabhDnevniciteApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      home: LoginPage(),
+      home: const LoginPage(),
     );
   }
 }

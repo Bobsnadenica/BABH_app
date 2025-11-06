@@ -1,0 +1,23 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-babhdnevnicite-dev-99327-authRole",
+      "UnauthRoleArn": "arn:aws:iam::534024919154:role/amplify-babhdnevnicite-dev-99327-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::534024919154:role/amplify-babhdnevnicite-dev-99327-authRole",
+      "Region": "eu-west-3",
+      "DeploymentBucketName": "amplify-babhdnevnicite-dev-99327-deployment",
+      "UnauthRoleName": "amplify-babhdnevnicite-dev-99327-unauthRole",
+      "StackName": "amplify-babhdnevnicite-dev-99327",
+      "StackId": "arn:aws:cloudformation:eu-west-3:534024919154:stack/amplify-babhdnevnicite-dev-99327/be2686d0-bb02-11f0-9eb5-0a4a62c1454d",
+      "AmplifyAppId": "d3m0btdgkmp550"
+    },
+    "categories": {
+      "auth": {
+        "babhdnevnicite6da03572": {}
+      },
+      "storage": {
+        "userphotos": {}
+      }
+    }
+  }
+}
