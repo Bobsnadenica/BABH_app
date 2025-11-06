@@ -29,6 +29,10 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _busy = true);
 
     try {
+      final session = await Amplify.Auth.fetchAuthSession();
+      if (session.isSignedIn) {
+        await Amplify.Auth.signOut();
+      }
       final result = await Amplify.Auth.signIn(
         username: _userCtrl.text.trim(),
         password: _passCtrl.text.trim(),
