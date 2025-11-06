@@ -318,13 +318,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Тестов достъп: testtest / testtest',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ),
                       const SizedBox(height: 56),
                       const SizedBox(height: 8),
                       // Footer
