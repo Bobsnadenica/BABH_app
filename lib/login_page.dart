@@ -23,7 +23,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   // Forgot password cooldown
   DateTime? _lastForgotRequest;
   int _forgotCooldownSeconds = 0;
-  // Timer is nullable, so we don't import dart:async at the top unless needed
   dynamic _forgotCooldownTimer;
 
   @override
@@ -106,7 +105,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         password: _passCtrl.text.trim(),
       );
 
-      // Handle "new password required" challenge
       if (result.nextStep.signInStep == AuthSignInStep.confirmSignInWithNewPassword) {
         final newPassword = await _promptForNewPassword();
         if (newPassword != null && newPassword.isNotEmpty) {
@@ -347,7 +345,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Forgot password: request code, then confirm with code + new password
   Future<void> _forgotPasswordFlow() async {
     // Check cooldown
     if (_lastForgotRequest != null) {
@@ -368,7 +365,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     final username = input.trim();
 
     try {
-      // Set cooldown
       setState(() {
         _lastForgotRequest = DateTime.now();
       });

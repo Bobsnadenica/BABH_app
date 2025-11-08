@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:amplify_storage_s3/amplify_storage_s3.dart';
+import 'amplify_storage.dart';
 
 class FrontPage extends StatelessWidget {
   const FrontPage({super.key});
@@ -15,61 +16,138 @@ class FrontPage extends StatelessWidget {
   static const List<String> folders = [
     'Входящ Контрол',
     'Изходящ контрол',
-    'Дневник на хигиенистка/персонал',
-    'Дневник за хигиенистка на обекта',
-    'Температура на хладилниците',
-    'Температура на Бенмарита',
-    'ДДД Дневник',
-    'Дневник за инструкции по системите',
+    'Темп. Хладилник',
+    'Хигиена Обект',
+    'Лична хигиена',
+    'Обуч. Персонал',
+    'ggg',
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Дневници')),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: GridView.builder(
-          itemCount: folders.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 3 / 2,
+      appBar: AppBar(
+        title: const Text('Дневници'),
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5F5FB), Color(0xFFE3F2FD)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          itemBuilder: (context, index) {
-            final name = folders[index];
-            return GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => FolderPage(folderName: name, assetIndex: index + 1),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(
+                  'Изберете дневник',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              child: Card(
-                elevation: 3,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Image.asset(
-                          'assets/${index + 1}.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.folder, size: 48),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Снимайте и съхранявайте документи по категории. Всичко е подредено и синхронизирано сигурно.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  itemCount: folders.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1,
+                  ),
+                  itemBuilder: (context, index) {
+                    final name = folders[index];
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FolderPage(
+                                folderName: name,
+                                assetIndex: index + 1,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          elevation: 4,
+                          shadowColor: Colors.black12,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Image.asset(
+                              'assets/${index + 1}.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.folder_special_rounded,
+                                size: 64,
+                              ),
+                            ),
+                          ),
+                          // The folder name text below is removed/commented out:
+                          // child: Column(
+                          //   mainAxisAlignment: MainAxisAlignment.center,
+                          //   children: [
+                          //     Expanded(
+                          //       child: Padding(
+                          //         padding: const EdgeInsets.all(10.0),
+                          //         child: Image.asset(
+                          //           'assets/${index + 1}.png',
+                          //           fit: BoxFit.contain,
+                          //           errorBuilder: (_, __, ___) => const Icon(
+                          //             Icons.folder_special_rounded,
+                          //             size: 42,
+                          //           ),
+                          //         ),
+                          //       ),
+                          //     ),
+                          //     Padding(
+                          //       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                          //       child: Text(
+                          //         name,
+                          //         textAlign: TextAlign.center,
+                          //         style: const TextStyle(
+                          //           fontWeight: FontWeight.w500,
+                          //           fontSize: 14,
+                          //         ),
+                          //         maxLines: 2,
+                          //         overflow: TextOverflow.ellipsis,
+                          //       ),
+                          //     ),
+                          //   ],
+                          // ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6),
-                      child: Text(name, textAlign: TextAlign.center),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
@@ -95,20 +173,30 @@ class _FolderPageState extends State<FolderPage> {
     _imagesFuture = _loadImages();
   }
 
-  /// Normalize scanned result from document_scanner_flutter and save to savePath.
+  Future<void> _deletePhoto(File file) async {
+    try {
+      await AmplifyStorageService.deleteFile(file, widget.folderName);
+      setState(() => _imagesFuture = _loadImages());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🗑️ Изображението е изтрито.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Грешка при изтриване: $e')),
+      );
+    }
+  }
+
   Future<File?> _normalizeScannedResult(dynamic scanned, String savePath) async {
     try {
       if (scanned == null) return null;
-      // document_scanner_flutter may return a File or an XFile (or platform type with path)
       if (scanned is File) {
         return await File(scanned.path).copy(savePath);
       }
-      // Common pattern: scanned has a 'path' getter
       final dynamic path = (scanned as dynamic).path;
       if (path is String && path.isNotEmpty) {
         return await File(path).copy(savePath);
       }
-      // Fallback: list of pages -> take first
       if (scanned is List && scanned.isNotEmpty) {
         final first = scanned.first;
         final dynamic p = (first as dynamic).path;
@@ -118,7 +206,6 @@ class _FolderPageState extends State<FolderPage> {
       }
       return null;
     } catch (e) {
-      debugPrint('⚠️ normalizeScannedResult error: $e');
       return null;
     }
   }
@@ -192,21 +279,18 @@ class _FolderPageState extends State<FolderPage> {
       }
 
       final folder = await _ensureFolder();
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final savePath = '${folder.path}/$timestamp.jpg';
+      // Prevent duplicate uploads and saves for the same day within a folder
+      final todayPrefix = DateTime.now().toIso8601String().split('T').first;
+      final existing = folder.listSync().where((f) => f.path.contains(todayPrefix));
+      final count = existing.length;
+      final savePath = '${folder.path}/${todayPrefix}_${count + 1}.jpg';
 
       await File(photo.path).copy(savePath);
 
       try {
-        final user = await Amplify.Auth.getCurrentUser();
-        final key = '${user.userId}/${widget.folderName}/$timestamp.jpg';
-        await Amplify.Storage.uploadFile(
-          localFile: AWSFile.fromPath(savePath),
-          key: key,
-        );
-        debugPrint('✅ Uploaded to S3: $key');
+        await AmplifyStorageService.uploadFile(File(savePath), widget.folderName);
       } catch (e) {
-        debugPrint('⚠️ Upload to S3 failed: $e');
+        // removed debugPrint
       }
 
       if (!mounted) return;
@@ -216,7 +300,7 @@ class _FolderPageState extends State<FolderPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      debugPrint('❌ scanAndSave error: $e');
+      // removed debugPrint
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Грешка при заснемане: $e')),
       );
@@ -228,55 +312,135 @@ class _FolderPageState extends State<FolderPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.folderName)),
-      body: FutureBuilder<List<File>>(
-        future: _imagesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(child: Text('Грешка при зареждане на изображенията'));
-          }
-          final images = snapshot.data ?? [];
-          if (images.isEmpty) {
-            return const Center(child: Text('Няма изображения. Натиснете бутона за сканиране, за да добавите.'));
-          }
-          return GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: images.length,
-            itemBuilder: (_, i) {
-              final file = images[i];
-              final fileName = file.path.split('/').last;
-              String dateLabel = '';
-              try {
-                final nameWithoutExt = fileName.split('.').first;
-                final parsed = DateTime.tryParse(nameWithoutExt.replaceAll('-', ':')) ?? DateTime.now();
-                dateLabel = '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
-              } catch (_) {
-                dateLabel = '';
-              }
-              return GestureDetector(
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (_) => Dialog(child: Image.file(file, fit: BoxFit.contain)),
-                ),
-                child: Column(
-                  children: [
-                    Expanded(child: Image.file(file, fit: BoxFit.cover)),
-                    const SizedBox(height: 4),
-                    Text(dateLabel, style: const TextStyle(fontSize: 12)),
-                  ],
+      appBar: AppBar(
+        title: Text(widget.folderName),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            onPressed: _syncFromS3,
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5F5FB), Color(0xFFE3F2FD)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: FutureBuilder<List<File>>(
+          future: _imagesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(child: Text('Грешка при зареждане на изображенията'));
+            }
+            final images = snapshot.data ?? [];
+            if (images.isEmpty) {
+              return const Center(
+                child: Text(
+                  'Няма изображения.\nНатиснете бутона за сканиране, за да добавите първия документ.',
+                  textAlign: TextAlign.center,
                 ),
               );
-            },
-          );
-        },
+            }
+            return GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: images.length,
+              itemBuilder: (_, i) {
+                final file = images[i];
+                final fileName = file.path.split('/').last;
+                String dateLabel = '';
+                try {
+                  final nameWithoutExt = fileName.split('.').first;
+                  final parsed = DateTime.tryParse(nameWithoutExt) ?? DateTime.now();
+                  dateLabel =
+                      '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
+                } catch (_) {
+                  dateLabel = '';
+                }
+                return GestureDetector(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => Dialog(
+                      backgroundColor: Colors.black.withOpacity(0.8),
+                      insetPadding: const EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Stack(
+                        children: [
+                          InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.8,
+                            maxScale: 3,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.file(file, fit: BoxFit.contain),
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 28),
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                await _deletePhoto(file);
+                              },
+                            ),
+                          ),
+                          if (dateLabel.isNotEmpty)
+                            Positioned(
+                              bottom: 12,
+                              left: 16,
+                              child: Text(
+                                dateLabel,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(file, fit: BoxFit.cover),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (dateLabel.isNotEmpty)
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _busy ? null : _scanAndSave,
@@ -286,5 +450,30 @@ class _FolderPageState extends State<FolderPage> {
             : const Icon(Icons.document_scanner),
       ),
     );
+  }
+
+  Future<void> _syncFromS3() async {
+    try {
+      final localDir = await _ensureFolder();
+      final s3Items = await AmplifyStorageService.listFolder(widget.folderName);
+      for (final item in s3Items) {
+        final fileName = item.key.split('/').last;
+        final localFile = File('${localDir.path}/$fileName');
+        if (!await localFile.exists()) {
+          await AmplifyStorageService.downloadFile(item.key, localFile);
+        }
+      }
+
+      setState(() => _imagesFuture = _loadImages());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Синхронизацията е завършена.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Грешка при синхронизация: $e')),
+      );
+    }
   }
 }
