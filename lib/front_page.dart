@@ -70,8 +70,8 @@ class FrontPage extends StatelessWidget {
                   itemCount: folders.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
                     childAspectRatio: 1,
                   ),
                   itemBuilder: (context, index) {
@@ -97,49 +97,20 @@ class FrontPage extends StatelessWidget {
                           ),
                           elevation: 4,
                           shadowColor: Colors.black12,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
+                          clipBehavior: Clip.antiAlias,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
                             child: Image.asset(
                               'assets/${index + 1}.png',
-                              fit: BoxFit.contain,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.folder_special_rounded,
                                 size: 64,
                               ),
                             ),
                           ),
-                          // The folder name text below is removed/commented out:
-                          // child: Column(
-                          //   mainAxisAlignment: MainAxisAlignment.center,
-                          //   children: [
-                          //     Expanded(
-                          //       child: Padding(
-                          //         padding: const EdgeInsets.all(10.0),
-                          //         child: Image.asset(
-                          //           'assets/${index + 1}.png',
-                          //           fit: BoxFit.contain,
-                          //           errorBuilder: (_, __, ___) => const Icon(
-                          //             Icons.folder_special_rounded,
-                          //             size: 42,
-                          //           ),
-                          //         ),
-                          //       ),
-                          //     ),
-                          //     Padding(
-                          //       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                          //       child: Text(
-                          //         name,
-                          //         textAlign: TextAlign.center,
-                          //         style: const TextStyle(
-                          //           fontWeight: FontWeight.w500,
-                          //           fontSize: 14,
-                          //         ),
-                          //         maxLines: 2,
-                          //         overflow: TextOverflow.ellipsis,
-                          //       ),
-                          //     ),
-                          //   ],
-                          // ),
                         ),
                       ),
                     );
@@ -466,11 +437,14 @@ class _FolderPageState extends State<FolderPage> {
 
       setState(() => _imagesFuture = _loadImages());
       if (!mounted) return;
+      // Hide any previous snackbar before showing a new one
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Синхронизацията е завършена.')),
       );
     } catch (e) {
       if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Грешка при синхронизация: $e')),
       );
