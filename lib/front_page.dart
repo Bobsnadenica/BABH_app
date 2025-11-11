@@ -183,7 +183,8 @@ class _FolderPageState extends State<FolderPage> {
 
   Future<Directory> _ensureFolder() async {
     final base = await getApplicationDocumentsDirectory();
-    final dir = Directory('${base.path}/${widget.folderName}');
+    final user = await Amplify.Auth.getCurrentUser();
+    final dir = Directory('${base.path}/${user.username}/${widget.folderName}');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
