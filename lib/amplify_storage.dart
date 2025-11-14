@@ -69,9 +69,9 @@ class AmplifyStorageService {
   }
 
   /// Deletes a remote object by filename (does not touch local files).
-  static Future<void> deleteRemoteFileByName(String fileName, String folderName) async {
-    final user = await Amplify.Auth.getCurrentUser();
-    final key = '${user.username}/$folderName/$fileName';
+  static Future<void> deleteRemoteFileByName(String fileName, String folderName, {String? username}) async {
+    final user = username ?? (await Amplify.Auth.getCurrentUser()).username;
+    final key = '$user/$folderName/$fileName';
     await Amplify.Storage.remove(key: key);
   }
 }

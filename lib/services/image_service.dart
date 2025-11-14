@@ -119,7 +119,7 @@ class ImageService {
 
   /// Deletes a local and cloud photo file.
   /// Syncs the deletion to S3 storage.
-  Future<void> deletePhoto(File file, String folderName) async {
+  Future<void> deletePhoto(File file, String folderName, {String? username}) async {
     // Move files to an app-managed trash folder instead of permanently deleting locally.
     final fileName = file.path.split('/').last;
     final idx = fileName.lastIndexOf('.');
@@ -129,22 +129,26 @@ class ImageService {
         : '${baseName}_thumb';
 
     try {
-      // Delete remote main file immediately
-      await AmplifyStorageService.deleteRemoteFileByName(fileName.contains('_thumb') ? baseName : fileName, folderName);
+      // Delete remote main file immediately (respect optional username for admin)
+      await AmplifyStorageService.deleteRemoteFileByName(
+        fileName.contains('_thumb') ? baseName : fileName,
+        folderName,
+        username: username,
+      );
     } catch (e) {
       safePrint('$_logPrefix ⚠️ Remote main delete failed (may not exist): $e');
     }
 
     // Also attempt to delete remote thumbnail
     try {
-      await AmplifyStorageService.deleteRemoteFileByName(thumbName, folderName);
+      await AmplifyStorageService.deleteRemoteFileByName(thumbName, folderName, username: username);
     } catch (e) {
       safePrint('$_logPrefix ⚠️ Remote thumbnail delete failed (may not exist): $e');
     }
 
     // Move local main file and local thumbnail (if present) into trash
     try {
-      final localDir = await ensureFolder(folderName);
+      final localDir = await ensureFolder(folderName, username: username);
       final trashDir = Directory('${localDir.path}/trash');
       if (!await trashDir.exists()) await trashDir.create(recursive: true);
 

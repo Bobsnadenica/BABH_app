@@ -140,7 +140,7 @@ class _FolderPageState extends State<FolderPage> {
   /// Handles photo deletion with error handling and UI feedback.
   Future<void> _handleDeletePhoto(File file) async {
     try {
-      await _imageService.deletePhoto(file, widget.folderName);
+      await _imageService.deletePhoto(file, widget.folderName, username: widget.username);
       if (mounted) {
         _refreshImageList();
         _showMessage('🗑️ Изображението е изтрито.');
