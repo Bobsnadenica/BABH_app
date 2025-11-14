@@ -13,6 +13,7 @@ dependencies:
   # Camera and image management
   camera: ^0.10.6
   image_picker: ^1.2.0
+  image: ^4.3.0
 
   # File system and viewing
   path_provider: ^2.1.5
