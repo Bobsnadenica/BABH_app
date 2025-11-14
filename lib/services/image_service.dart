@@ -275,16 +275,26 @@ class ImageService {
     }
   }
 
-  /// Extracts date from filename (ISO8601 format: YYYY-MM-DD).
+  /// Extracts date from filename (YYYY-MM-DD or YYYY-MM-DD_xx patterns).
   /// Returns formatted date string or empty string if parsing fails.
   String extractDateLabel(String fileName) {
     try {
-      // If a thumbnail filename is passed in, remove the _thumb suffix first
-      var name = fileName;
-      if (name.contains('_thumb')) name = name.replaceFirst('_thumb', '');
+      // Remove thumbnail marker if present
+      var name = fileName.replaceFirst('_thumb', '');
+
+      // Remove extension
       final nameWithoutExt = name.split('.').first;
-      final parsed = DateTime.tryParse(nameWithoutExt) ?? DateTime.now();
-      return '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
+
+      // Extract only the date part (before the underscore, if any)
+      final parts = nameWithoutExt.split('_');
+      final datePart = parts.isNotEmpty ? parts.first : nameWithoutExt;
+
+      final parsed = DateTime.tryParse(datePart);
+      if (parsed == null) return '';
+
+      return '${parsed.day.toString().padLeft(2, '0')}.'
+          '${parsed.month.toString().padLeft(2, '0')}.'
+          '${parsed.year}';
     } catch (_) {
       return '';
     }
