@@ -6,28 +6,62 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
-import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
-import 'package:amplify_storage_s3/amplify_storage_s3.dart';
+// Amplify usage is through service helpers; explicit imports were removed to
+// avoid unused import warnings in this file.
 import 'amplify_storage.dart';
+import 'auth_utils.dart';
 
-class FrontPage extends StatelessWidget {
+// Shared logout action used in multiple AppBars to avoid duplicated code.
+Widget logoutButton(BuildContext context) {
+  return IconButton(
+    icon: const Icon(Icons.logout),
+    tooltip: 'Изход',
+    onPressed: () async {
+      await AuthUtils.signOut();
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    },
+  );
+}
+
+const List<String> folders = [
+  'Входящ Контрол',
+  'Изходящ контрол',
+  'Темп. Хладилник',
+  'Хигиена Обект',
+  'Лична хигиена',
+  'Обуч. Персонал',
+  'ДДД',
+];
+
+class FrontPage extends StatefulWidget {
   const FrontPage({super.key});
 
-  static const List<String> folders = [
-    'Входящ Контрол',
-    'Изходящ контрол',
-    'Темп. Хладилник',
-    'Хигиена Обект',
-    'Лична хигиена',
-    'Обуч. Персонал',
-    'ggg',
-  ];
+  @override
+  State<FrontPage> createState() => _FrontPageState();
+}
+
+class _FrontPageState extends State<FrontPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final groups = await AuthUtils.getUserGroups();
+        if (groups.contains('admins') && mounted) {
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdminUsersPage()));
+        }
+      } catch (_) {}
+    });
+  }
+
+  // folders moved to top-level `folders`
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Дневници'),
+        actions: [logoutButton(context)],
         centerTitle: true,
         elevation: 0,
       ),
@@ -125,10 +159,62 @@ class FrontPage extends StatelessWidget {
   }
 }
 
+class AdminUsersPage extends StatefulWidget {
+  const AdminUsersPage({super.key});
+
+  @override
+  State<AdminUsersPage> createState() => _AdminUsersPageState();
+}
+
+class _AdminUsersPageState extends State<AdminUsersPage> {
+  late Future<List<String>> _usersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _usersFuture = AmplifyStorageService.listAllUserPrefixes();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Потребителски пространства'),
+        actions: [logoutButton(context)],
+      ),
+      body: FutureBuilder<List<String>>(
+        future: _usersFuture,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          final users = snap.data ?? [];
+          if (users.isEmpty) return const Center(child: Text('Няма намерени потребителски пространства'));
+          return ListView.builder(
+            itemCount: users.length,
+            itemBuilder: (context, i) {
+              final u = users[i];
+              return ListTile(
+                title: Text(u),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AdminUserFoldersPage(username: u)),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 class FolderPage extends StatefulWidget {
   final String folderName;
   final int assetIndex;
-  const FolderPage({super.key, required this.folderName, required this.assetIndex});
+  final String? username; // if set, browse another user's space (admin)
+  const FolderPage({super.key, required this.folderName, required this.assetIndex, this.username});
 
   @override
   State<FolderPage> createState() => _FolderPageState();
@@ -183,8 +269,12 @@ class _FolderPageState extends State<FolderPage> {
 
   Future<Directory> _ensureFolder() async {
     final base = await getApplicationDocumentsDirectory();
+    // If an admin is browsing another user's space, use that username
+    // for the local cache path so files for different remote users are
+    // kept separate.
     final user = await Amplify.Auth.getCurrentUser();
-    final dir = Directory('${base.path}/${user.username}/${widget.folderName}');
+    final owner = (widget.username != null && widget.username!.isNotEmpty) ? widget.username! : user.username;
+    final dir = Directory('${base.path}/$owner/${widget.folderName}');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
@@ -427,7 +517,7 @@ class _FolderPageState extends State<FolderPage> {
   Future<void> _syncFromS3() async {
     try {
       final localDir = await _ensureFolder();
-      final s3Items = await AmplifyStorageService.listFolder(widget.folderName);
+  final s3Items = await AmplifyStorageService.listFolder(widget.folderName, username: widget.username);
       for (final item in s3Items) {
         final fileName = item.key.split('/').last;
         final localFile = File('${localDir.path}/$fileName');
@@ -450,5 +540,62 @@ class _FolderPageState extends State<FolderPage> {
         SnackBar(content: Text('Грешка при синхронизация: $e')),
       );
     }
+  }
+}
+
+class AdminUserFoldersPage extends StatefulWidget {
+  final String username;
+  const AdminUserFoldersPage({super.key, required this.username});
+
+  @override
+  State<AdminUserFoldersPage> createState() => _AdminUserFoldersPageState();
+}
+
+class _AdminUserFoldersPageState extends State<AdminUserFoldersPage> {
+  late Future<List<String>> _foldersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _foldersFuture = AmplifyStorageService.listUserFolders(widget.username);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Дневници на: ${widget.username}'),
+        actions: [logoutButton(context),
+        ],
+      ),
+      body: FutureBuilder<List<String>>(
+        future: _foldersFuture,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          final userFolders = snap.data ?? [];
+          if (userFolders.isEmpty) return const Center(child: Text('Няма намерени дневници за този потребител'));
+          return ListView.builder(
+            itemCount: userFolders.length,
+            itemBuilder: (context, i) {
+              final f = userFolders[i];
+              return ListTile(
+                title: Text(f),
+                onTap: () {
+                  // Use the canonical `folders` list to find a matching asset index.
+                  final idx = folders.indexOf(f);
+                  final assetIndex = (idx >= 0) ? (idx + 1) : 1;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FolderPage(folderName: f, assetIndex: assetIndex, username: widget.username),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
