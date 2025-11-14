@@ -2,20 +2,25 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
+import '../amplify_storage.dart';
 import '../services/image_service.dart';
 import '../widgets/background_logo.dart';
 import '../widgets/image_grid.dart';
 
 /// Folder page for managing photos within a specific folder.
 /// Handles camera capture, upload to S3, and sync from cloud.
+/// If [username] is provided, admin can browse another user's space.
 class FolderPage extends StatefulWidget {
   final String folderName;
   final int assetIndex;
+  final String? username;
 
   const FolderPage({
     super.key,
     required this.folderName,
     required this.assetIndex,
+    this.username,
   });
 
   @override
@@ -31,15 +36,105 @@ class _FolderPageState extends State<FolderPage> {
   @override
   void initState() {
     super.initState();
-    _imagesFuture = _imageService.loadImages(widget.folderName);
+    _imagesFuture = _imageService.loadImages(widget.folderName, username: widget.username);
   }
 
   /// Refreshes the image list by reloading from disk.
   void _refreshImageList() {
-    final imagesFuture = _imageService.loadImages(widget.folderName);
+    final imagesFuture = _imageService.loadImages(widget.folderName, username: widget.username);
     setState(() {
       _imagesFuture = imagesFuture;
     });
+  }
+
+  /// Handles opening an image. If the full image is not present locally,
+  /// downloads it from S3 (thumbnail-first strategy) and then shows it.
+  Future<void> _handleOpenImage(File previewFile, String baseName) async {
+    final localDir = await _imageService.ensureFolder(widget.folderName);
+    final fullLocal = File('${localDir.path}/$baseName');
+
+    if (!await fullLocal.exists()) {
+      if (_busy) return;
+      setState(() {
+        _busy = true;
+        _loadingMessage = 'Изтегляне на пълно изображение...';
+      });
+
+      try {
+        final user = await Amplify.Auth.getCurrentUser();
+        // Use admin-provided username if available, otherwise use current user
+        final owner = (widget.username != null && widget.username!.isNotEmpty) ? widget.username! : user.username;
+        final key = '$owner/${widget.folderName}/$baseName';
+        await AmplifyStorageService.downloadFile(key, fullLocal);
+        safePrint('📸 ⬇️ Downloaded full image: $baseName');
+      } catch (e) {
+        _showMessage('Грешка при сваляне на изображението: $e');
+        return;
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+
+    if (!mounted) return;
+    _showFullImageDialog(fullLocal);
+  }
+
+  void _showFullImageDialog(File file) {
+    final fileName = file.path.split('/').last;
+    final dateLabel = _imageService.extractDateLabel(fileName);
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black.withValues(alpha: 0.8),
+        insetPadding: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.8,
+              maxScale: 3,
+              child: ClipRRect(
+                borderRadius: BorderRadius.zero,
+                child: Image.file(file, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 28),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  _handleDeletePhoto(file);
+                },
+              ),
+            ),
+            if (dateLabel.isNotEmpty)
+              Positioned(
+                bottom: 12,
+                left: 16,
+                child: Text(
+                  dateLabel,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Handles photo deletion with error handling and UI feedback.
@@ -109,7 +204,7 @@ class _FolderPageState extends State<FolderPage> {
   /// Syncs photos from S3 to local storage.
   Future<void> _handleSyncFromS3() async {
     try {
-      final downloadCount = await _imageService.syncPhotosFromS3(widget.folderName);
+      final downloadCount = await _imageService.syncPhotosFromS3(widget.folderName, username: widget.username);
       if (!mounted) return;
 
       _refreshImageList();
@@ -175,6 +270,7 @@ class _FolderPageState extends State<FolderPage> {
                   images: images,
                   extractDateLabel: _imageService.extractDateLabel,
                   onDeletePressed: _handleDeletePhoto,
+                  onImageTap: _handleOpenImage,
                 );
               },
             ),
