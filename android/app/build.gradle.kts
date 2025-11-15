@@ -7,8 +7,9 @@ plugins {
 
 android {
     namespace = "com.example.babh_dnevnicite"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Use explicit versions to satisfy plugin requirements (camera, amplify, etc.)
+    compileSdk = 36
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -24,7 +25,7 @@ android {
         applicationId = "com.example.babh_dnevnicite"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 33
+        minSdk = 29
         targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
