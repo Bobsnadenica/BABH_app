@@ -26,6 +26,8 @@ dependencies:
 
   # Network
   connectivity_plus: ^7.0.0
+  url_launcher: ^6.3.2
+  shared_preferences: ^2.5.3
 
 dependency_overrides:
   photo_view: ^0.14.0

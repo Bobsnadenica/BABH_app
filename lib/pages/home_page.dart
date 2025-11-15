@@ -1,3 +1,4 @@
+import 'package:babh_dnevnicite/services/consent_service.dart';
 import 'package:flutter/material.dart';
 import '../auth_utils.dart';
 import '../amplify_storage.dart';
@@ -45,6 +46,12 @@ class _HomePageState extends State<HomePage> {
         final groups = await AuthUtils.getUserGroups();
         if (groups.contains('admins') && mounted) {
           Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdminUsersPage()));
+        }
+        else {
+                    // Show consent dialog after first frame
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await ConsentDialog.showIfNeeded(context);
+          });
         }
       } catch (_) {}
     });
