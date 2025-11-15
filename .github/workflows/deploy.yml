@@ -1,43 +1,64 @@
+# Secrets required:
+#PLAY_STORE_JSON	Google Play API JSON key (service account)
+#APP_STORE_CONNECT_API_KEY	App Store Connect private key JSON file
+#APP_STORE_CONNECT_KEY_ID	App Store Connect Key ID
+#APP_STORE_CONNECT_ISSUER_ID	App Store Connect Issuer ID
 name: Deploy Flutter App
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch: # Run manually from GitHub Actions tab
 
 jobs:
   build-and-deploy:
     runs-on: macos-latest
+    env:
+      FLUTTER_CHANNEL: stable
 
     steps:
-      - uses: actions/checkout@v3
+      # 1️⃣ Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      # 2️⃣ Setup Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.13.0' # set your Flutter version
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 4️⃣ Build Android AAB
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+
+      # 5️⃣ Build iOS (no codesign, signing handled by Fastlane)
+      - name: Build iOS App (archive)
+        run: flutter build ios --release --no-codesign
+
+      # 6️⃣ Setup Ruby for Fastlane
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.2
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 'stable'
+      # 7️⃣ Install Fastlane
+      - name: Install Fastlane
+        run: gem install fastlane -NV
 
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Build Android & Deploy
+      # 8️⃣ Deploy Android to Play Store
+      - name: Deploy Android
+        working-directory: android
+        run: fastlane release
         env:
-          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
-        run: |
-          echo "$PLAY_STORE_JSON_KEY" > android/playstore-service-account.json
-          cd android
-          bundle exec fastlane deploy
+          SUPPLY_JSON_KEY: ${{ secrets.PLAY_STORE_JSON }}
 
-      - name: Build iOS & Deploy
-        if: runner.os == 'macOS'
+      # 9️⃣ Deploy iOS to App Store
+      - name: Deploy iOS
+        working-directory: ios
+        run: fastlane release
         env:
-          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
-        run: |
-          echo "$APP_STORE_CONNECT_KEY" > ios/api_key.json
-          cd ios
-          bundle exec fastlane deploy
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
