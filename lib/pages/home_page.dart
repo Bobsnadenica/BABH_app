@@ -12,7 +12,7 @@ const List<String> folders = [
   'Хигиена Обект',
   'Лична хигиена',
   'Обуч. Персонал',
-  'ggg',
+  'ДДД',
 ];
 
 // Shared logout button used in multiple AppBars to avoid duplicated code

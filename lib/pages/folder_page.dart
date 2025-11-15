@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:babh_dnevnicite/widgets/network_connection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import '../amplify_storage.dart';
 import '../services/image_service.dart';
 import '../widgets/background_logo.dart';
@@ -50,6 +52,7 @@ class _FolderPageState extends State<FolderPage> {
   /// Handles opening an image. If the full image is not present locally,
   /// downloads it from S3 (thumbnail-first strategy) and then shows it.
   Future<void> _handleOpenImage(File previewFile, String baseName) async {
+    if (!await checkInternetAndShowDialog(context)) return; // must come first
     final localDir = await _imageService.ensureFolder(widget.folderName);
     final fullLocal = File('${localDir.path}/$baseName');
 
@@ -100,25 +103,68 @@ class _FolderPageState extends State<FolderPage> {
                 child: Image.file(file, fit: BoxFit.contain),
               ),
             ),
+            // Close button (top-right)
             Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(context),
+              top: 12,
+              right: 12,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6), // semi-transparent dark background
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(2, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  padding: const EdgeInsets.all(8), // extra padding inside circle
+                  constraints: const BoxConstraints(), // remove default constraints for smaller circle
+                ),
               ),
             ),
+
+            // Delete button (bottom-right)
             Positioned(
-              bottom: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 28),
-                onPressed: () async {
-                  Navigator.pop(context);
-                  _handleDeletePhoto(file);
-                },
+              bottom: 12,
+              right: 12,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8), // semi-transparent light background
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(2, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    _handleDeletePhoto(file);
+                  },
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                ),
               ),
             ),
+
+
             if (dateLabel.isNotEmpty)
               Positioned(
                 bottom: 12,
@@ -139,6 +185,7 @@ class _FolderPageState extends State<FolderPage> {
 
   /// Handles photo deletion with error handling and UI feedback.
   Future<void> _handleDeletePhoto(File file) async {
+    if (!await checkInternetAndShowDialog(context)) return; // must come first
     try {
       await _imageService.deletePhoto(file, widget.folderName, username: widget.username);
       if (mounted) {
@@ -152,9 +199,14 @@ class _FolderPageState extends State<FolderPage> {
     }
   }
 
+/// Captures a photo from camera, saves locally, and uploads to S3.
+/// Supports multiple pages.
   /// Captures a photo from camera, saves locally, and uploads to S3.
+/// Supports multiple pages and handles cancellations safely.
   Future<void> _handleCapturePhoto() async {
+    if (!await checkInternetAndShowDialog(context)) return; // must come first
     if (_busy) return;
+
     setState(() {
       _busy = true;
       _loadingMessage = 'Снимане...';
@@ -166,58 +218,92 @@ class _FolderPageState extends State<FolderPage> {
         return;
       }
 
-      // Capture photo from camera
-      final picker = ImagePicker();
-      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-      if (photo == null) {
-        _showMessage('Снимането е отменено.');
+      // ---- ML KIT DOCUMENT SCANNER ----
+      final scanner = DocumentScanner(
+        options: DocumentScannerOptions(
+          documentFormat: DocumentFormat.jpeg,
+          mode: ScannerMode.base,
+          isGalleryImport: false,
+          pageLimit: 10, // allow multiple pages
+        ),
+      );
+
+      DocumentScanningResult? scanningResult;
+
+      try {
+        scanningResult = await scanner.scanDocument();
+      } catch (e) {
+        // User closed scanner or an error occurred
+        _showMessage('Сканирането е отменено.');
+        return;
+      }
+
+      if (scanningResult == null || scanningResult.images.isEmpty) {
+        _showMessage('Сканирането е отменено.');
         return;
       }
 
       if (mounted) setState(() => _loadingMessage = 'Запазване локално...');
-      // Save photo locally
-      final savePath = await _imageService.capturePhotoLocally(widget.folderName);
-      await File(photo.path).copy(savePath);
 
-      // Upload to S3
-      try {
-        if (mounted) setState(() => _loadingMessage = 'Компресиране и качване...');
-        await _imageService.uploadPhoto(File(savePath), widget.folderName);
-      } catch (e) {
-        if (mounted) {
-          _showMessage('Внимание: снимката не се качи в хранилището: $e');
+      // ---- SAVE & UPLOAD EACH SCANNED PAGE ----
+      for (var scannedImagePath in scanningResult.images) {
+        final savePath = await _imageService.capturePhotoLocally(widget.folderName);
+        await File(scannedImagePath).copy(savePath);
+
+        try {
+          if (mounted) setState(() => _loadingMessage = 'Компресиране и качване...');
+          await _imageService.uploadPhoto(File(savePath), widget.folderName);
+        } catch (e) {
+          if (mounted) {
+            _showMessage('Внимание: снимката не се качи в хранилището: $e');
+          }
         }
       }
 
+      scanner.close();
+
       if (!mounted) return;
+
       _refreshImageList();
-      _showMessage('Документът е заснет и запазен успешно.');
+      _showMessage('Документът е сканиран и запазен успешно. (${scanningResult.images.length} страници)');
     } catch (e, st) {
       if (!mounted) return;
       debugPrint('Error during capture: $e\n$st');
-      _showMessage('Грешка при заснемане: $e');
+      _showMessage('Грешка при сканиране: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  /// Syncs photos from S3 to local storage.
-  Future<void> _handleSyncFromS3() async {
-    try {
-      final downloadCount = await _imageService.syncPhotosFromS3(widget.folderName, username: widget.username);
-      if (!mounted) return;
 
-      _refreshImageList();
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Синхронизацията е завършена. Изтеглени: $downloadCount файла.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _showMessage('Грешка при синхронизация: $e');
-    }
+/// Syncs photos from S3 to local storage with a fullscreen loading overlay.
+Future<void> _handleSyncFromS3(BuildContext context) async {
+  if (!await checkInternetAndShowDialog(context)) return; // must come first
+  if (_busy) return;
+
+  setState(() {
+    _busy = true;
+    _loadingMessage = 'Синхронизиране от облака...';
+  });
+
+  try {
+    final downloadCount = await _imageService.syncPhotosFromS3(
+      widget.folderName,
+      username: widget.username,
+    );
+
+    if (!mounted) return;
+
+    _refreshImageList();
+    _showMessage('✅ Синхронизацията е завършена. Изтеглени: $downloadCount файла.');
+  } catch (e) {
+    if (!mounted) return;
+    _showMessage('Грешка при синхронизация: $e');
+  } finally {
+    if (mounted) setState(() => _busy = false);
   }
+}
+
 
   /// Shows a snackbar message to the user.
   void _showMessage(String message) {
@@ -236,7 +322,7 @@ class _FolderPageState extends State<FolderPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
-            onPressed: _handleSyncFromS3,
+            onPressed: () => _handleSyncFromS3(context),
           ),
         ],
       ),

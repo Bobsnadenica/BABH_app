@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:babh_dnevnicite/widgets/network_connection.dart';
 import 'package:flutter/material.dart';
 import '../front_page.dart';
 import '../services/auth_service.dart';
@@ -79,6 +80,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   /// Handles login with validation and auth service.
   Future<void> _handleLogin(String username, String password) async {
+    if (!await checkInternetAndShowDialog(context)) return; // must come first
     setState(() => _busy = true);
 
     try {
@@ -114,6 +116,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   /// Initiates forgot password flow.
   Future<void> _handleForgotPassword() async {
+    if (!await checkInternetAndShowDialog(context)) return; // must come first
     if (!_authService.canRequestPasswordReset(_lastForgotRequest, 120)) {
       _showError('Моля, изчакайте 2 минути преди да заявите отново.');
       _updateForgotCooldown();
