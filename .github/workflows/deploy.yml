@@ -1,0 +1,43 @@
+name: Deploy Flutter App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Android & Deploy
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: |
+          echo "$PLAY_STORE_JSON_KEY" > android/playstore-service-account.json
+          cd android
+          bundle exec fastlane deploy
+
+      - name: Build iOS & Deploy
+        if: runner.os == 'macOS'
+        env:
+          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          echo "$APP_STORE_CONNECT_KEY" > ios/api_key.json
+          cd ios
+          bundle exec fastlane deploy
