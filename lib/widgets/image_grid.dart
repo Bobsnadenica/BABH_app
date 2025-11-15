@@ -116,6 +116,4 @@ class ImageGrid extends StatelessWidget {
       ),
     );
   }
-
-  
 }

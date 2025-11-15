@@ -315,90 +315,119 @@ Future<void> _handleSyncFromS3(BuildContext context) async {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.folderName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () => _handleSyncFromS3(context),
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          const BackgroundLogo(),
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFF5F5FB).withValues(alpha: 0.80),
-                  const Color(0xFFE3F2FD).withValues(alpha: 0.80),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: FutureBuilder<List<File>>(
-              future: _imagesFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return const Center(child: Text('Грешка при зареждане на изображенията'));
-                }
-                final images = snapshot.data ?? [];
-                return ImageGrid(
-                  images: images,
-                  extractDateLabel: _imageService.extractDateLabel,
-                  onDeletePressed: _handleDeletePhoto,
-                  onImageTap: _handleOpenImage,
-                );
-              },
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text(widget.folderName),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.sync),
+          onPressed: () => _handleSyncFromS3(context),
+        ),
+      ],
+    ),
+    body: Stack(
+      children: [
+        const BackgroundLogo(),
+        Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFF5F5FB).withValues(alpha: 0.80),
+                const Color(0xFFE3F2FD).withValues(alpha: 0.80),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
-          // Fullscreen loading overlay
-          if (_busy)
-            Positioned.fill(
+
+          child: Column(
+            children: [
+              // warning banner for image responsibility
+            Material(
+              color: Theme.of(context).appBarTheme.backgroundColor 
+                    ?? Theme.of(context).colorScheme.surface,
+              elevation: 4,
               child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      strokeWidth: 3,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      _loadingMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                child: const Text(
+                  'Отговорността за качените изображения е изцяло ваша. Моля проверявайте внимателно съдържанието преди изпращане!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
                 ),
               ),
             ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _busy ? null : _handleCapturePhoto,
-        tooltip: 'Сканирай документ (камера)',
-        child: _busy
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.document_scanner),
-      ),
-    );
-  }
+
+              Expanded(
+                child: FutureBuilder<List<File>>(
+                  future: _imagesFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(child: Text('Грешка при зареждане на изображенията'));
+                    }
+                    final images = snapshot.data ?? [];
+                    return ImageGrid(
+                      images: images,
+                      extractDateLabel: _imageService.extractDateLabel,
+                      onDeletePressed: _handleDeletePhoto,
+                      onImageTap: _handleOpenImage,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Fullscreen loading overlay
+        if (_busy)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 3,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _loadingMessage,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: _busy ? null : _handleCapturePhoto,
+      tooltip: 'Сканирай документ (камера)',
+      child: _busy
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.document_scanner),
+    ),
+  );
+}
+
 }
