@@ -1,5 +1,4 @@
 import 'package:amplify_flutter/amplify_flutter.dart';
-import 'package:flutter/foundation.dart';
 
 /// Service for authentication and password management operations.
 /// Handles login, forgot password flow, and related Amplify Auth interactions.

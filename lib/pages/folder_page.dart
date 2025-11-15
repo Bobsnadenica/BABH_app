@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:babh_dnevnicite/widgets/network_connection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import '../amplify_storage.dart';
@@ -238,7 +237,7 @@ class _FolderPageState extends State<FolderPage> {
         return;
       }
 
-      if (scanningResult == null || scanningResult.images.isEmpty) {
+      if (scanningResult.images.isEmpty) {
         _showMessage('Сканирането е отменено.');
         return;
       }
@@ -366,23 +365,23 @@ Widget build(BuildContext context) {
             ),
 
               Expanded(
-                child: FutureBuilder<List<File>>(
-                  future: _imagesFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return const Center(child: Text('Грешка при зареждане на изображенията'));
-                    }
-                    final images = snapshot.data ?? [];
-                    return ImageGrid(
-                      images: images,
-                      extractDateLabel: _imageService.extractDateLabel,
-                      onDeletePressed: _handleDeletePhoto,
-                      onImageTap: _handleOpenImage,
-                    );
-                  },
+          child: FutureBuilder<List<File>>(
+            future: _imagesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('Грешка при зареждане на изображенията'));
+              }
+              final images = snapshot.data ?? [];
+              return ImageGrid(
+                images: images,
+                extractDateLabel: _imageService.extractDateLabel,
+                onDeletePressed: _handleDeletePhoto,
+                onImageTap: _handleOpenImage,
+              );
+            },
                 ),
               ),
             ],

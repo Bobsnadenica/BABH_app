@@ -36,11 +36,23 @@ class BabhDnevniciteApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'БАБХ Дневниците',
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: Colors.grey[100],
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
+        ),
+        // Neutralize any unexpected purple accent by specifying selection/cursor colors
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: Colors.blueGrey,
+          selectionColor: Colors.blueGrey.withOpacity(0.25),
+          selectionHandleColor: Colors.blueGrey,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.blueGrey),
+          ),
         ),
       ),
       home: const LoginPage(),

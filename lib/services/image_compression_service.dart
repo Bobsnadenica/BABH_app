@@ -2,23 +2,25 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'dart:math' as math;
+import 'app_config_service.dart';
 
 /// Service for compressing image files while maintaining acceptable quality.
 /// Balances file size reduction with visual quality preservation.
+/// Uses configuration from S3 app_properties.json.
 class ImageCompressionService {
   static const String _logPrefix = '🖼️';
-  
-  // Compression settings for good balance between quality and size
-  static const int _maxWidth = 1920;
-  static const int _maxHeight = 1920;
-  static const int _jpegQuality = 85; // 0-100, higher = better quality but larger file
-  static const int _thumbMaxDimension = 400;
 
   /// Compresses an image file in-place.
   /// Reduces dimensions if larger than max and applies JPEG compression.
   /// Returns the compression ratio (original / compressed).
   static Future<double> compressImage(File imageFile) async {
     try {
+      final config = await AppConfigService.getConfig();
+      final compressionMap = config['compression'] as Map<String, dynamic>? ?? {};
+      final quality = compressionMap['quality'] as int? ?? 85;
+      final maxWidth = compressionMap['maxWidth'] as int? ?? 1920;
+      final maxHeight = compressionMap['maxHeight'] as int? ?? 1920;
+
       final originalSize = await imageFile.length();
       safePrint('$_logPrefix Compressing: ${imageFile.path} (${_formatBytes(originalSize)})');
 
@@ -32,14 +34,14 @@ class ImageCompressionService {
       }
 
       // Resize if larger than max dimensions
-      if (image.width > _maxWidth || image.height > _maxHeight) {
+      if (image.width > maxWidth || image.height > maxHeight) {
         image = img.copyResize(
           image,
           width: image.width > image.height
-              ? _maxWidth
+              ? maxWidth
               : null,
           height: image.height > image.width
-              ? _maxHeight
+              ? maxHeight
               : null,
           interpolation: img.Interpolation.linear,
         );
@@ -47,7 +49,7 @@ class ImageCompressionService {
       }
 
       // Encode as JPEG with specified quality
-      final compressedBytes = img.encodeJpg(image, quality: _jpegQuality);
+      final compressedBytes = img.encodeJpg(image, quality: quality);
       
       // Write back to file
       await imageFile.writeAsBytes(compressedBytes);
@@ -65,11 +67,17 @@ class ImageCompressionService {
     }
   }
 
-  /// Compresses an image and converts it to WebP.
-  /// Writes a new file next to the original with the same basename and `.webp` extension.
-  /// Returns the resulting WebP file.
+  /// Compresses an image and converts it to JPEG.
+  /// Writes a new file next to the original with the same basename and `.jpg` extension.
+  /// Returns the resulting JPEG file.
   static Future<File> compressToJpeg(File imageFile) async {
     try {
+      final config = await AppConfigService.getConfig();
+      final compressionMap = config['compression'] as Map<String, dynamic>? ?? {};
+      final quality = compressionMap['quality'] as int? ?? 85;
+      final maxWidth = compressionMap['maxWidth'] as int? ?? 1920;
+      final maxHeight = compressionMap['maxHeight'] as int? ?? 1920;
+
       final originalSize = await imageFile.length();
       safePrint('$_logPrefix Compressing to JPEG: ${imageFile.path} (${_formatBytes(originalSize)})');
 
@@ -81,15 +89,15 @@ class ImageCompressionService {
       }
 
       // Resize if larger than max dimensions while keeping aspect ratio
-      if (image.width > _maxWidth || image.height > _maxHeight) {
-        final scale = math.min(_maxWidth / image.width, _maxHeight / image.height);
+      if (image.width > maxWidth || image.height > maxHeight) {
+        final scale = math.min(maxWidth / image.width, maxHeight / image.height);
         final newW = (image.width * scale).round();
         final newH = (image.height * scale).round();
         image = img.copyResize(image, width: newW, height: newH, interpolation: img.Interpolation.linear);
         safePrint('$_logPrefix Resized to ${image.width}x${image.height}');
       }
 
-      final compressedBytes = img.encodeJpg(image, quality: _jpegQuality);
+      final compressedBytes = img.encodeJpg(image, quality: quality);
 
       final outPath = _replaceExtensionWith(imageFile.path, '.jpg');
       final outFile = File(outPath);
@@ -114,19 +122,26 @@ class ImageCompressionService {
     }
   }
 
-  /// Creates a thumbnail (WebP) next to the original with suffix `_thumb.webp`.
+  /// Creates a thumbnail (JPEG) next to the original with suffix `_thumb.jpg`.
+  /// Uses thumbnail dimensions and quality from app config.
   static Future<File?> createThumbnail(File imageFile) async {
     try {
+      final config = await AppConfigService.getConfig();
+      final compressionMap = config['compression'] as Map<String, dynamic>? ?? {};
+      final thumbnailQuality = compressionMap['thumbnailQuality'] as int? ?? 70;
+      final thumbnailWidth = compressionMap['thumbnailWidth'] as int? ?? 256;
+      final thumbnailHeight = compressionMap['thumbnailHeight'] as int? ?? 256;
+
       final bytes = await imageFile.readAsBytes();
       img.Image? image = img.decodeImage(bytes);
       if (image == null) return null;
 
-      final scale = math.min(_thumbMaxDimension / image.width, _thumbMaxDimension / image.height);
+      final scale = math.min(thumbnailWidth / image.width, thumbnailHeight / image.height);
       final newW = (image.width * scale).round();
       final newH = (image.height * scale).round();
 
       final thumb = img.copyResize(image, width: newW, height: newH, interpolation: img.Interpolation.linear);
-      final thumbBytes = img.encodeJpg(thumb, quality: (_jpegQuality - 20).clamp(30, 80));
+      final thumbBytes = img.encodeJpg(thumb, quality: thumbnailQuality);
 
       final base = imageFile.path;
       final idx = base.lastIndexOf('.');
@@ -157,3 +172,4 @@ class ImageCompressionService {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
+
